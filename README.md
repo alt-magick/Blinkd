@@ -3,13 +3,13 @@ Command line tool to check for website updates
 
 This tool should compile on windows and linux.
 
-Run: 
-blinkd add www.website.com 
+Run:<br> 
+blinkd add www.website.com<br> 
 To create a list of websites to check.
 
-Run: 
-blinkd del www.website.com 
+Run: <br>
+blinkd del www.website.com<br> 
 To remove a website from the list.
 
-Run blinkd without any arguments 
+Run blinkd without any arguments<br> 
 To print your websites ordered by the most recently updated.
