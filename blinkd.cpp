@@ -12,6 +12,7 @@
 #include <atomic>
 #include <chrono>
 #include <regex>
+#include <sys/stat.h> // For checking file existence
 
 std::string trim(const std::string& str) {
     size_t first = str.find_first_not_of(" \t\r\n");
@@ -19,6 +20,11 @@ std::string trim(const std::string& str) {
     if (first == std::string::npos || last == std::string::npos)
         return "";
     return str.substr(first, last - first + 1);
+}
+
+bool file_exists(const std::string& filename) {
+    struct stat buffer;
+    return (stat(filename.c_str(), &buffer) == 0);
 }
 
 class DotAnimator {
@@ -52,7 +58,14 @@ private:
 };
 
 std::string fetch_content(const std::string& url, const std::string& tmpfile) {
-    std::string cmd = "curl -s \"" + url + "\" -o " + tmpfile;
+    std::string cmd;
+    if (file_exists("cookies.txt")) {
+        cmd = "curl -s -b cookies.txt -c cookies.txt \"" + url + "\" -o " + tmpfile;
+    }
+    else {
+        cmd = "curl -s \"" + url + "\" -o " + tmpfile;
+    }
+
     int result = system(cmd.c_str());
     if (result != 0) return "";
 
@@ -205,11 +218,51 @@ std::vector<std::string> load_urls(const std::string& filename) {
     return urls;
 }
 
-int main() {
+int main(int argc, char* argv[]) {
     const std::string url_file = "websites.txt";
     const std::string sig_file = "signatures.txt";
     const std::string time_file = "timestamps.txt";
     const std::string tmp_file = "tmp_web_content.txt";
+
+    if (argc >= 3) {
+        std::string command = argv[1];
+        std::string target_url = trim(argv[2]);
+
+        std::vector<std::string> urls = load_urls(url_file);
+
+        if (command == "add") {
+            if (std::find(urls.begin(), urls.end(), target_url) != urls.end()) {
+                std::cout << "URL already exists in " << url_file << "\n";
+            }
+            else {
+                std::ofstream out(url_file, std::ios::app);
+                out << target_url << "\n";
+                std::cout << "Added URL to " << url_file << "\n";
+            }
+            return 0;
+        }
+        else if (command == "delete") {
+            auto it = std::remove(urls.begin(), urls.end(), target_url);
+            if (it == urls.end()) {
+                std::cout << "URL not found in " << url_file << "\n";
+            }
+            else {
+                urls.erase(it, urls.end());
+                std::ofstream out(url_file);
+                for (const auto& url : urls)
+                    out << url << "\n";
+                std::cout << "Deleted URL from " << url_file << "\n";
+            }
+            return 0;
+        }
+        else {
+            std::cerr << "Unknown command: " << command << "\n";
+            std::cerr << "Usage:\n";
+            std::cerr << "  " << argv[0] << " add <url>\n";
+            std::cerr << "  " << argv[0] << " delete <url>\n";
+            return 1;
+        }
+    }
 
     std::vector<std::string> urls = load_urls(url_file);
     if (urls.empty()) {
