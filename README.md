@@ -23,3 +23,9 @@ To remove a website from the list.
 Run blinkd without any arguments,<br> 
 To list your websites ordered by the most recently updated.
 
+Optionally you can download an extension for you browser
+to create a cookies.txt file and save it in the Blinkd directory.
+The Netscape cookies.txt format is plain text, and curl can use it directly.
+This will allow Blinkd to automatically open websites like Facebook that
+require you to be logged into their service.
+
