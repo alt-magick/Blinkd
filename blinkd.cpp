@@ -3,16 +3,15 @@
 #include <string>
 #include <map>
 #include <vector>
-#include <cstdlib>  // for system()
+#include <cstdlib>
 #include <sstream>
 #include <ctime>
-#include <iomanip>  // for std::put_time
-#include <algorithm> // for std::sort, std::remove
+#include <iomanip>
+#include <algorithm>
 #include <thread>
 #include <atomic>
 #include <chrono>
 
-// Trim leading/trailing whitespace
 std::string trim(const std::string& str) {
     size_t first = str.find_first_not_of(" \t\r\n");
     size_t last = str.find_last_not_of(" \t\r\n");
@@ -21,7 +20,6 @@ std::string trim(const std::string& str) {
     return str.substr(first, last - first + 1);
 }
 
-// Dots animation class
 class DotAnimator {
 public:
     DotAnimator() : active(false) {}
@@ -34,11 +32,11 @@ public:
                 std::string dots = std::string(dot_count, '.');
                 std::cout << "\r" << message << " " << dots << std::string(4 - dot_count, ' ') << std::flush;
                 dot_count++;
-                if (dot_count > 4) dot_count = 0;  // zero dots after 4
+                if (dot_count > 4) dot_count = 0;
                 std::this_thread::sleep_for(std::chrono::milliseconds(400));
             }
             std::cout << "\r" << std::string(message.size() + 5, ' ') << "\r" << std::flush;
-            });
+        });
     }
 
     void stop() {
@@ -52,7 +50,6 @@ private:
     std::thread anim_thread;
 };
 
-// Fetch website content using curl to a temp file, then read it
 std::string fetch_content(const std::string& url, const std::string& tmpfile) {
     std::string cmd = "curl -s \"" + url + "\" -o " + tmpfile;
     int result = system(cmd.c_str());
@@ -66,15 +63,13 @@ std::string fetch_content(const std::string& url, const std::string& tmpfile) {
     return oss.str();
 }
 
-// Simple hash function (not cryptographically secure)
 unsigned long simple_hash(const std::string& s) {
     unsigned long hash = 5381;
     for (size_t i = 0; i < s.size(); ++i)
-        hash = ((hash << 5) + hash) + s[i]; // hash * 33 + c
+        hash = ((hash << 5) + hash) + s[i];
     return hash;
 }
 
-// Return current date-time in a friendly format
 std::string current_datetime() {
     time_t now = time(0);
     struct tm t;
@@ -84,20 +79,18 @@ std::string current_datetime() {
     localtime_r(&now, &t);
 #endif
     std::ostringstream oss;
-    oss << std::put_time(&t, "%b %d, %Y %I:%M %p");  // e.g., "May 29, 2025 02:45 PM"
+    oss << std::put_time(&t, "%b %d, %Y %I:%M %p");
     return oss.str();
 }
 
-// Convert datetime string to time_t for sorting (assumes fixed format "%b %d, %Y %I:%M %p")
 time_t parse_datetime(const std::string& datetime_str) {
     struct tm t = {};
     std::istringstream ss(datetime_str);
     ss >> std::get_time(&t, "%b %d, %Y %I:%M %p");
-    if (ss.fail()) return 0;  // If parsing fails, treat as very old time
+    if (ss.fail()) return 0;
     return mktime(&t);
 }
 
-// Load saved signatures from a file
 std::map<std::string, unsigned long> load_signatures(const std::string& filename) {
     std::map<std::string, unsigned long> sigs;
     std::ifstream in(filename.c_str());
@@ -112,14 +105,12 @@ std::map<std::string, unsigned long> load_signatures(const std::string& filename
     return sigs;
 }
 
-// Save current signatures to a file
 void save_signatures(const std::string& filename, const std::map<std::string, unsigned long>& sigs) {
     std::ofstream out(filename.c_str());
     for (const auto& pair : sigs)
         out << pair.first << " " << pair.second << "\n";
 }
 
-// Load saved timestamps from a file
 std::map<std::string, std::string> load_times(const std::string& filename) {
     std::map<std::string, std::string> times;
     std::ifstream in(filename.c_str());
@@ -135,14 +126,12 @@ std::map<std::string, std::string> load_times(const std::string& filename) {
     return times;
 }
 
-// Save current timestamps to a file
 void save_times(const std::string& filename, const std::map<std::string, std::string>& times) {
     std::ofstream out(filename.c_str());
     for (const auto& pair : times)
         out << pair.first << " " << pair.second << "\n";
 }
 
-// Load list of URLs from a file
 std::vector<std::string> load_urls(const std::string& filename) {
     std::vector<std::string> urls;
     std::ifstream in(filename.c_str());
@@ -155,14 +144,12 @@ std::vector<std::string> load_urls(const std::string& filename) {
     return urls;
 }
 
-// Save list of URLs to a file
 void save_urls(const std::string& filename, const std::vector<std::string>& urls) {
     std::ofstream out(filename.c_str());
     for (const auto& url : urls)
         out << url << "\n";
 }
 
-// Helper to ensure URL starts with http:// or https://
 std::string normalize_url(const std::string& url) {
     if (url.find("http://") == 0 || url.find("https://") == 0)
         return url;
@@ -175,7 +162,6 @@ int main(int argc, char* argv[]) {
     const std::string time_file = "timestamps.txt";
     const std::string tmp_file = "tmp_web_content.txt";
 
-    // Handle add and del commands
     if (argc > 1) {
         std::string cmd = argv[1];
 
@@ -189,19 +175,25 @@ int main(int argc, char* argv[]) {
                     urls.push_back(url);
                     save_urls(url_file, urls);
                     std::cout << "\nAdded: " << url << std::endl << std::endl;
-                }
-                else {
+                } else {
                     std::cout << "\nURL already exists: " << url << std::endl << std::endl;
                 }
-            }
-            else if (cmd == "del") {
+            } else if (cmd == "del") {
                 auto it = std::remove(urls.begin(), urls.end(), url);
                 if (it != urls.end()) {
                     urls.erase(it, urls.end());
                     save_urls(url_file, urls);
+
+                    std::map<std::string, unsigned long> sigs = load_signatures(sig_file);
+                    sigs.erase(url);
+                    save_signatures(sig_file, sigs);
+
+                    std::map<std::string, std::string> times = load_times(time_file);
+                    times.erase(url);
+                    save_times(time_file, times);
+
                     std::cout << "\nDeleted: " << url << std::endl << std::endl;
-                }
-                else {
+                } else {
                     std::cout << "\nURL not found: " << url << std::endl << std::endl;
                 }
             }
@@ -210,8 +202,6 @@ int main(int argc, char* argv[]) {
     }
 
     std::vector<std::string> urls = load_urls(url_file);
-
-    // New check: If no groups, print message and exit
     if (urls.empty()) {
         std::cout << "\nNo groups in website.txt" << std::endl << std::endl;
         return 0;
@@ -224,17 +214,24 @@ int main(int argc, char* argv[]) {
 
     struct Result {
         std::string url;
-        std::string status;      // "New site", "Changed", "No change", "Failed"
-        std::string timestamp;   // timestamp to print
-        bool timestamp_updated;  // true if timestamp was updated this run (new or changed)
+        std::string status;
+        std::string timestamp;
+        bool timestamp_updated;
     };
     std::vector<Result> results;
 
     DotAnimator dots_anim;
 
     for (const auto& url : urls) {
+        auto start_time = std::chrono::steady_clock::now();
         dots_anim.start("Checking " + url);
         std::string content = fetch_content(url, tmp_file);
+        auto elapsed = std::chrono::steady_clock::now() - start_time;
+
+        auto min_duration = std::chrono::milliseconds(1500);
+        if (elapsed < min_duration) {
+            std::this_thread::sleep_for(min_duration - elapsed);
+        }
         dots_anim.stop();
 
         if (content.empty()) {
@@ -252,13 +249,11 @@ int main(int argc, char* argv[]) {
 
         if (is_new) {
             new_times[url] = now_str;
-            results.push_back({ url, "New site added", now_str, true });  // timestamp updated
-        }
-        else if (has_changed) {
+            results.push_back({ url, "New site added", now_str, true });
+        } else if (has_changed) {
             new_times[url] = now_str;
-            results.push_back({ url, "Content changed", now_str, true });  // timestamp updated
-        }
-        else {
+            results.push_back({ url, "Content changed", now_str, true });
+        } else {
             std::string previous_time = old_times.count(url) ? old_times[url] : "Never checked before";
             new_times[url] = previous_time;
             results.push_back({ url, "No change", previous_time, false });
@@ -269,36 +264,28 @@ int main(int argc, char* argv[]) {
     save_times(time_file, new_times);
     std::remove(tmp_file.c_str());
 
-    // Sort results by timestamp, oldest first. Treat "Never checked before" as oldest.
     std::sort(results.begin(), results.end(), [](const Result& a, const Result& b) {
         if (a.timestamp == "Never checked before") return true;
         if (b.timestamp == "Never checked before") return false;
         return parse_datetime(a.timestamp) < parse_datetime(b.timestamp);
-        });
+    });
 
-    // Print all results in order, highlighting timestamp in green if timestamp was updated this run
-    std::cout << std::endl;  // newline before output
-
-    std::cout << "Sites" << std::endl;
-    std::cout << std::string(5, '-') << std::endl;
+    std::cout << std::endl << "Sites" << std::endl << "-----" << std::endl;
 
     for (const auto& res : results) {
         std::cout << res.url << " - ";
         if (res.status != "Failed to retrieve content") {
             if (res.timestamp_updated) {
-                std::cout << "\033[1;32m" << res.timestamp << "\033[0m";  // green if updated this run
+                std::cout << "\033[1;32m" << res.timestamp << "\033[0m";
+            } else {
+                std::cout << res.timestamp;
             }
-            else {
-                std::cout << res.timestamp;  // normal color if not updated
-            }
-        }
-        else {
+        } else {
             std::cout << res.status;
         }
         std::cout << std::endl;
     }
 
-    std::cout << std::endl;  // newline after output
-
+    std::cout << std::endl;
     return 0;
 }
