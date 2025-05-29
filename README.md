@@ -11,5 +11,5 @@ Run: <br>
 blinkd del www.website.com<br> 
 To remove a website from the list.
 
-Run blinkd without any arguments<br> 
-To print your websites ordered by the most recently updated.
+Run blinkd without any arguments,<br> 
+To list your websites ordered by the most recently updated.
