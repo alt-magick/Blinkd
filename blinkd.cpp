@@ -36,7 +36,7 @@ public:
                 std::this_thread::sleep_for(std::chrono::milliseconds(400));
             }
             std::cout << "\r" << std::string(message.size() + 5, ' ') << "\r" << std::flush;
-        });
+            });
     }
 
     void stop() {
@@ -70,7 +70,7 @@ unsigned long simple_hash(const std::string& s) {
     return hash;
 }
 
-std::string current_datetime() {
+std::string current_datetime_iso() {
     time_t now = time(0);
     struct tm t;
 #ifdef _WIN32
@@ -78,17 +78,22 @@ std::string current_datetime() {
 #else
     localtime_r(&now, &t);
 #endif
-    std::ostringstream oss;
-    oss << std::put_time(&t, "%b %d, %Y %I:%M %p");
-    return oss.str();
+    char buffer[20];
+    std::strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &t);
+    return std::string(buffer);
 }
 
-time_t parse_datetime(const std::string& datetime_str) {
-    struct tm t = {};
-    std::istringstream ss(datetime_str);
-    ss >> std::get_time(&t, "%b %d, %Y %I:%M %p");
-    if (ss.fail()) return 0;
-    return mktime(&t);
+std::string iso_to_human_readable(const std::string& iso) {
+    if (iso == "Never checked before") return iso;
+
+    std::tm tm = {};
+    std::istringstream ss(iso);
+    ss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
+    if (ss.fail()) return iso; // fallback if parsing fails
+
+    char buffer[64];
+    std::strftime(buffer, sizeof(buffer), "%b %d, %Y %I:%M %p", &tm);
+    return std::string(buffer);
 }
 
 std::map<std::string, unsigned long> load_signatures(const std::string& filename) {
@@ -175,10 +180,12 @@ int main(int argc, char* argv[]) {
                     urls.push_back(url);
                     save_urls(url_file, urls);
                     std::cout << "\nAdded: " << url << std::endl << std::endl;
-                } else {
+                }
+                else {
                     std::cout << "\nURL already exists: " << url << std::endl << std::endl;
                 }
-            } else if (cmd == "del") {
+            }
+            else if (cmd == "del") {
                 auto it = std::remove(urls.begin(), urls.end(), url);
                 if (it != urls.end()) {
                     urls.erase(it, urls.end());
@@ -193,7 +200,8 @@ int main(int argc, char* argv[]) {
                     save_times(time_file, times);
 
                     std::cout << "\nDeleted: " << url << std::endl << std::endl;
-                } else {
+                }
+                else {
                     std::cout << "\nURL not found: " << url << std::endl << std::endl;
                 }
             }
@@ -242,7 +250,7 @@ int main(int argc, char* argv[]) {
 
         unsigned long hash = simple_hash(content);
         new_sigs[url] = hash;
-        std::string now_str = current_datetime();
+        std::string now_str = current_datetime_iso();
 
         bool is_new = old_sigs.find(url) == old_sigs.end();
         bool has_changed = !is_new && old_sigs[url] != hash;
@@ -250,10 +258,12 @@ int main(int argc, char* argv[]) {
         if (is_new) {
             new_times[url] = now_str;
             results.push_back({ url, "New site added", now_str, true });
-        } else if (has_changed) {
+        }
+        else if (has_changed) {
             new_times[url] = now_str;
             results.push_back({ url, "Content changed", now_str, true });
-        } else {
+        }
+        else {
             std::string previous_time = old_times.count(url) ? old_times[url] : "Never checked before";
             new_times[url] = previous_time;
             results.push_back({ url, "No change", previous_time, false });
@@ -264,23 +274,31 @@ int main(int argc, char* argv[]) {
     save_times(time_file, new_times);
     std::remove(tmp_file.c_str());
 
+    // Sort results by timestamp descending (newest first)
     std::sort(results.begin(), results.end(), [](const Result& a, const Result& b) {
-        if (a.timestamp == "Never checked before") return true;
-        if (b.timestamp == "Never checked before") return false;
-        return parse_datetime(a.timestamp) < parse_datetime(b.timestamp);
-    });
+        // "Never checked before" should be last
+        if (a.timestamp == "Never checked before") return false;
+        if (b.timestamp == "Never checked before") return true;
+        return a.timestamp > b.timestamp;
+        });
+
+    // Reverse the results so output is ascending by timestamp (oldest first)
+    std::reverse(results.begin(), results.end());
 
     std::cout << std::endl << "Sites" << std::endl << "-----" << std::endl;
 
     for (const auto& res : results) {
         std::cout << res.url << " - ";
         if (res.status != "Failed to retrieve content") {
+            std::string human_date = iso_to_human_readable(res.timestamp);
             if (res.timestamp_updated) {
-                std::cout << "\033[1;32m" << res.timestamp << "\033[0m";
-            } else {
-                std::cout << res.timestamp;
+                std::cout << "\033[1;32m" << human_date << "\033[0m";
             }
-        } else {
+            else {
+                std::cout << human_date;
+            }
+        }
+        else {
             std::cout << res.status;
         }
         std::cout << std::endl;
