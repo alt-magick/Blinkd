@@ -11,6 +11,7 @@
 #include <thread>
 #include <atomic>
 #include <chrono>
+#include <regex>
 
 std::string trim(const std::string& str) {
     size_t first = str.find_first_not_of(" \t\r\n");
@@ -63,10 +64,65 @@ std::string fetch_content(const std::string& url, const std::string& tmpfile) {
     return oss.str();
 }
 
+std::string extract_meaningful_content(const std::string& html) {
+    std::ostringstream content;
+    bool in_tag = false, in_script = false, in_style = false;
+    std::string tag;
+
+    for (size_t i = 0; i < html.size(); ++i) {
+        char c = html[i];
+        if (c == '<') {
+            in_tag = true;
+            tag.clear();
+        }
+
+        if (in_tag) {
+            tag += c;
+            if (c == '>') {
+                in_tag = false;
+                std::string lower_tag = tag;
+                std::transform(lower_tag.begin(), lower_tag.end(), lower_tag.begin(), ::tolower);
+                if (lower_tag.find("<script") == 0) in_script = true;
+                if (lower_tag.find("</script") == 0) in_script = false;
+                if (lower_tag.find("<style") == 0) in_style = true;
+                if (lower_tag.find("</style") == 0) in_style = false;
+            }
+        }
+        else if (!in_script && !in_style) {
+            content << c;
+        }
+    }
+
+    std::string text = content.str();
+    text.erase(std::remove_if(text.begin(), text.end(), [](char c) {
+        return !isprint(c) && !isspace(c);
+        }), text.end());
+
+    std::string normalized;
+    bool last_was_space = false;
+    for (char c : text) {
+        if (isspace(c)) {
+            if (!last_was_space) {
+                normalized += ' ';
+                last_was_space = true;
+            }
+        }
+        else {
+            normalized += c;
+            last_was_space = false;
+        }
+    }
+
+    std::regex timestamp_regex(R"(\b\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?\b)");
+    normalized = std::regex_replace(normalized, timestamp_regex, "");
+
+    return normalized;
+}
+
 unsigned long simple_hash(const std::string& s) {
     unsigned long hash = 5381;
-    for (size_t i = 0; i < s.size(); ++i)
-        hash = ((hash << 5) + hash) + s[i];
+    for (char c : s)
+        hash = ((hash << 5) + hash) + c;
     return hash;
 }
 
@@ -89,7 +145,7 @@ std::string iso_to_human_readable(const std::string& iso) {
     std::tm tm = {};
     std::istringstream ss(iso);
     ss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
-    if (ss.fail()) return iso; // fallback if parsing fails
+    if (ss.fail()) return iso;
 
     char buffer[64];
     std::strftime(buffer, sizeof(buffer), "%b %d, %Y %I:%M %p", &tm);
@@ -149,69 +205,15 @@ std::vector<std::string> load_urls(const std::string& filename) {
     return urls;
 }
 
-void save_urls(const std::string& filename, const std::vector<std::string>& urls) {
-    std::ofstream out(filename.c_str());
-    for (const auto& url : urls)
-        out << url << "\n";
-}
-
-std::string normalize_url(const std::string& url) {
-    if (url.find("http://") == 0 || url.find("https://") == 0)
-        return url;
-    return "https://" + url;
-}
-
-int main(int argc, char* argv[]) {
+int main() {
     const std::string url_file = "websites.txt";
     const std::string sig_file = "signatures.txt";
     const std::string time_file = "timestamps.txt";
     const std::string tmp_file = "tmp_web_content.txt";
 
-    if (argc > 1) {
-        std::string cmd = argv[1];
-
-        if ((cmd == "add" || cmd == "del") && argc == 3) {
-            std::string raw_url = argv[2];
-            std::string url = normalize_url(raw_url);
-            std::vector<std::string> urls = load_urls(url_file);
-
-            if (cmd == "add") {
-                if (std::find(urls.begin(), urls.end(), url) == urls.end()) {
-                    urls.push_back(url);
-                    save_urls(url_file, urls);
-                    std::cout << "\nAdded: " << url << std::endl << std::endl;
-                }
-                else {
-                    std::cout << "\nURL already exists: " << url << std::endl << std::endl;
-                }
-            }
-            else if (cmd == "del") {
-                auto it = std::remove(urls.begin(), urls.end(), url);
-                if (it != urls.end()) {
-                    urls.erase(it, urls.end());
-                    save_urls(url_file, urls);
-
-                    std::map<std::string, unsigned long> sigs = load_signatures(sig_file);
-                    sigs.erase(url);
-                    save_signatures(sig_file, sigs);
-
-                    std::map<std::string, std::string> times = load_times(time_file);
-                    times.erase(url);
-                    save_times(time_file, times);
-
-                    std::cout << "\nDeleted: " << url << std::endl << std::endl;
-                }
-                else {
-                    std::cout << "\nURL not found: " << url << std::endl << std::endl;
-                }
-            }
-            return 0;
-        }
-    }
-
     std::vector<std::string> urls = load_urls(url_file);
     if (urls.empty()) {
-        std::cout << "\nNo groups in website.txt" << std::endl << std::endl;
+        std::cout << "\nNo URLs in websites.txt\n\n";
         return 0;
     }
 
@@ -237,9 +239,9 @@ int main(int argc, char* argv[]) {
         auto elapsed = std::chrono::steady_clock::now() - start_time;
 
         auto min_duration = std::chrono::milliseconds(1500);
-        if (elapsed < min_duration) {
+        if (elapsed < min_duration)
             std::this_thread::sleep_for(min_duration - elapsed);
-        }
+
         dots_anim.stop();
 
         if (content.empty()) {
@@ -248,7 +250,8 @@ int main(int argc, char* argv[]) {
             continue;
         }
 
-        unsigned long hash = simple_hash(content);
+        std::string cleaned = extract_meaningful_content(content);
+        unsigned long hash = simple_hash(cleaned);
         new_sigs[url] = hash;
         std::string now_str = current_datetime_iso();
 
@@ -274,19 +277,15 @@ int main(int argc, char* argv[]) {
     save_times(time_file, new_times);
     std::remove(tmp_file.c_str());
 
-    // Sort results by timestamp descending (newest first)
     std::sort(results.begin(), results.end(), [](const Result& a, const Result& b) {
-        // "Never checked before" should be last
         if (a.timestamp == "Never checked before") return false;
         if (b.timestamp == "Never checked before") return true;
         return a.timestamp > b.timestamp;
         });
 
-    // Reverse the results so output is ascending by timestamp (oldest first)
     std::reverse(results.begin(), results.end());
 
-    std::cout << std::endl << "Sites" << std::endl << "-----" << std::endl;
-
+    std::cout << "\nSites\n-----\n";
     for (const auto& res : results) {
         std::cout << res.url << " - ";
         if (res.status != "Failed to retrieve content") {
@@ -301,9 +300,9 @@ int main(int argc, char* argv[]) {
         else {
             std::cout << res.status;
         }
-        std::cout << std::endl;
+        std::cout << "\n";
     }
 
-    std::cout << std::endl;
+    std::cout << "\n";
     return 0;
 }
