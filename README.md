@@ -27,5 +27,5 @@ Optionally, you can create a cookies.txt file and save it in the Blinkd director
 The Netscape cookies.txt format is plain text, and curl can use it directly.
 You will need to download an extension for your browser to create the cookies.txt file.
 This will allow Blinkd to check websites like Facebook which require you to be logged 
-into their service.
+in to their service.
 
