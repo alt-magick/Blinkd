@@ -7,6 +7,7 @@ To compile on linux:<br>
 g++ -o blinkd blinkd.cpp -std=c++17 -pthread
 <br>
 
+To use the program,<br>
 Run:<br> 
 blinkd add www.website.com<br> 
 To create a list of websites to check.
