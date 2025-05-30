@@ -205,11 +205,56 @@ std::vector<std::string> load_urls(const std::string& filename) {
     return urls;
 }
 
-int main() {
+void save_urls(const std::string& filename, const std::vector<std::string>& urls) {
+    std::ofstream out(filename.c_str());
+    for (const std::string& url : urls)
+        out << url << "\n";
+}
+
+std::string ensure_https_prefix(const std::string& url) {
+    if (url.compare(0, 8, "https://") == 0 || url.compare(0, 7, "http://") == 0)
+        return url;
+    return "https://" + url;
+}
+
+int main(int argc, char* argv[]) {
     const std::string url_file = "websites.txt";
     const std::string sig_file = "signatures.txt";
     const std::string time_file = "timestamps.txt";
     const std::string tmp_file = "tmp_web_content.txt";
+
+    if (argc >= 3) {
+        std::string command = argv[1];
+        std::string url = argv[2];
+        url = trim(url);
+        url = ensure_https_prefix(url);
+
+        if (command == "add") {
+            std::vector<std::string> urls = load_urls(url_file);
+            if (std::find(urls.begin(), urls.end(), url) == urls.end()) {
+                urls.push_back(url);
+                save_urls(url_file, urls);
+                std::cout << "Added URL: " << url << "\n";
+            }
+            else {
+                std::cout << "URL already exists: " << url << "\n";
+            }
+            return 0;
+        }
+        else if (command == "del") {
+            std::vector<std::string> urls = load_urls(url_file);
+            auto it = std::remove(urls.begin(), urls.end(), url);
+            if (it != urls.end()) {
+                urls.erase(it, urls.end());
+                save_urls(url_file, urls);
+                std::cout << "Deleted URL: " << url << "\n";
+            }
+            else {
+                std::cout << "URL not found: " << url << "\n";
+            }
+            return 0;
+        }
+    }
 
     std::vector<std::string> urls = load_urls(url_file);
     if (urls.empty()) {
