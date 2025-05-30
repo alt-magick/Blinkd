@@ -212,6 +212,13 @@ std::vector<std::string> load_urls(const std::string& filename) {
     return urls;
 }
 
+// Helper to ensure https:// prefix
+std::string ensure_https_prefix(const std::string& url) {
+    if (url.find("http://") == 0 || url.find("https://") == 0)
+        return url;
+    return "https://" + url;
+}
+
 int main(int argc, char* argv[]) {
     const std::string url_file = "websites.txt";
     const std::string sig_file = "signatures.txt";
@@ -221,6 +228,7 @@ int main(int argc, char* argv[]) {
     if (argc >= 3) {
         std::string command = argv[1];
         std::string target_url = trim(argv[2]);
+        target_url = ensure_https_prefix(target_url);
 
         std::vector<std::string> urls = load_urls(url_file);
 
@@ -229,8 +237,26 @@ int main(int argc, char* argv[]) {
                 std::cout << "URL already exists in " << url_file << "\n";
             }
             else {
-                std::ofstream out(url_file, std::ios::app);
-                out << target_url << "\n";
+                std::fstream file(url_file, std::ios::in | std::ios::out | std::ios::app);
+                if (!file) {
+                    std::cerr << "Error opening " << url_file << "\n";
+                    return 1;
+                }
+
+                // Check if file ends with newline, if not add one
+                file.seekg(0, std::ios::end);
+                if (file.tellg() > 0) {
+                    file.seekg(-1, std::ios::end);
+                    char lastChar;
+                    file.get(lastChar);
+                    if (lastChar != '\n') {
+                        file.clear(); // clear EOF flag
+                        file.seekp(0, std::ios::end);
+                        file << "\n";
+                    }
+                }
+
+                file << target_url << "\n";
                 std::cout << "Added URL to " << url_file << "\n";
             }
             return 0;
