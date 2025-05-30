@@ -58,13 +58,7 @@ private:
 };
 
 std::string fetch_content(const std::string& url, const std::string& tmpfile) {
-    std::string cmd;
-    if (file_exists("cookies.txt")) {
-        cmd = "curl -s -b cookies.txt -c cookies.txt \"" + url + "\" -o " + tmpfile;
-    }
-    else {
-        cmd = "curl -s \"" + url + "\" -o " + tmpfile;
-    }
+    std::string cmd = "curl -s \"" + url + "\" -o " + tmpfile;
 
     int result = system(cmd.c_str());
     if (result != 0) return "";
